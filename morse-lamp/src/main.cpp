@@ -8,22 +8,32 @@
 
 #include <Hash.h>
 
-#define USE_SERIAL Serial
+#define USE_SERIAL Serial1
 
 SocketIOclient socketIO;
 
+// Parameters
+char name[64] = "a";
+char endpoint[64] = "b";
+
+// State variables
+int state = 0;
+int prev_state = -1;
+
+// Decode socketio messages and switch light accordingly
 void setLight(uint8_t * payload) {
-    StaticJsonDocument<200> doc;
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payload);
     JsonArray array = doc.as<JsonArray>();
     JsonObject data = array[1];
     for (const auto& kv : data) {
-        if (kv.key() == "b") {
+        if (kv.key() == endpoint) {
             digitalWrite(5, data[kv.key()]);
         }
     }
 }
 
+// Socketio handler
 void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length) {
     switch(type) {
         case sIOtype_DISCONNECT:
@@ -31,7 +41,6 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
             break;
         case sIOtype_CONNECT:
             USE_SERIAL.printf("[IOc] Connected to url: %s\n", payload);
-
             // join default namespace (no auto join in Socket.IO V3)
             socketIO.send(sIOtype_CONNECT, "/");
             break;
@@ -80,6 +89,7 @@ void setup() {
     Serial.print("Connected, IP address: ");
     Serial.println(WiFi.localIP());
 
+    // Socketio server connection
     socketIO.begin("10.31.137.4", 7777, "/socket.io/?EIO=4");
     socketIO.onEvent(socketIOEvent);
 
@@ -88,14 +98,19 @@ void setup() {
 
 void loop() {
     socketIO.loop();
+    // Read capacitive touch
     int a = analogRead(A0);
+    char result[100];
     if (a > 600) {
-        // digitalWrite(5, HIGH);
-        socketIO.sendEVENT("[\"b\",{\"sender\":\"a\",\"msg\":1}]");
+        state = 1;
     }
     else {
-        // digitalWrite(5, LOW);
-        socketIO.sendEVENT("[\"b\",{\"sender\":\"a\",\"msg\":0}]");
+        state = 0; 
+    }
+    // Broadcast
+    if (state != prev_state) {
+        snprintf(result, 128, "[\"b\",{\"sender\":\"%s\",\"msg\":%d}]", name, state);
+        socketIO.sendEVENT(result);
     }
     delay(10);
 }
