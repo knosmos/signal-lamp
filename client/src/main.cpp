@@ -13,8 +13,8 @@
 SocketIOclient socketIO;
 
 // Parameters
-char name[64] = "a";
-char endpoint[64] = "b";
+char name[64] = "b";        // who am I?
+char endpoint[64] = "a";    // who am I listening to?
 
 // State variables
 int state = 0;
@@ -100,7 +100,7 @@ void loop() {
     socketIO.loop();
     // Read capacitive touch
     int a = analogRead(A0);
-    char result[100];
+    char result[128];
     if (a > 600) {
         state = 1;
     }
@@ -112,5 +112,6 @@ void loop() {
         snprintf(result, 128, "[\"b\",{\"sender\":\"%s\",\"msg\":%d}]", name, state);
         socketIO.sendEVENT(result);
     }
+    prev_state = state;
     delay(10);
 }
